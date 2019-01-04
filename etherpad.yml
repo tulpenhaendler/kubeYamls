@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: default
+  name: etherpad
+spec:
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1  
+  selector:
+    matchLabels:
+      app: etherpad
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: etherpad
+    spec:
+      containers: # port 9001
+      - name: etherpad
+        image: phocean/etherpad
+        ports:
+        - containerPort: 9001
+        volumeMounts:
+        - mountPath: /opt/etherpad-lite/var
+          name: etherpad-vol
+      volumes:
+      - name: etherpad-vol
+        awsElasticBlockStore:
+          volumeID: < > 
+          fsType: ext4
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: etherpad
+spec:
+  selector:
+    app: etherpad
+  ports:
+  - protocol: TCP
+    port: 9001
+    targetPort: 9001
+  type: NodePort
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: etherpad-ing
+  namespace: default
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    kubernetes.io/tls-acme: 'true'
+spec:
+  rules:
+    - host: etherpad.domain.com
+      http:
+        paths:
+          - backend:
+              serviceName: etherpad
+              servicePort: 9001
+            path: /
+  tls:
+    - hosts:
+        - "etherpad.domain.com"
+      secretName: etherpad-tls
